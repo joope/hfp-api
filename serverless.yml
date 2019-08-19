@@ -1,0 +1,51 @@
+service: hfp-api
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: dev
+  region: eu-west-1
+  environment:
+    SQS_URL: https://sqs.#{AWS::Region}.amazonaws.com/#{AWS::AccountId}
+    SNS_ARN: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:TrackingTopic"
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "sqs:*"
+      Resource: "arn:aws:sqs:*"
+    - Effect: "Allow"
+      Resource: "arn:aws:sns:*"
+      Action:
+        - "sns:*"
+
+functions:
+  startStepFunction:
+    handler: tracking.start
+    events:
+      - http:
+          path: tracking
+          method: post
+    memorySize: 256
+    timeout: 2
+  startTracking:
+    handler: tracking.track
+    events:
+      - sns: TrackingTopic
+    memorySize: 256
+    timeout: 601
+  getTrackingStatus:
+    handler: tracking.getStatus
+    events:
+      - http:
+          path: tracking/{transport_mode}/{operator_id}/{vehicle_number}
+          method: get
+          request:
+            parameters:
+              paths:
+                transport_mode: true
+                operator_id: true
+                vehicle_number: true
+
+plugins:
+  - serverless-step-functions
+  - serverless-pseudo-parameters
