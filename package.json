@@ -4,7 +4,7 @@
   "description": "",
   "main": "tracking.js",
   "dependencies": {
-    "mqtt": "^3.0.0"
+    "mqtt": "^3.0.0",
   },
   "devDependencies": {
     "serverless-pseudo-parameters": "^2.4.0",

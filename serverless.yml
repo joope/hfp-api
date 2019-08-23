@@ -1,4 +1,4 @@
-service: hfp-api
+service: hfp-api-v2
 
 provider:
   name: aws
@@ -8,6 +8,7 @@ provider:
   environment:
     SQS_URL: https://sqs.#{AWS::Region}.amazonaws.com/#{AWS::AccountId}
     SNS_ARN: "arn:aws:sns:#{AWS::Region}:#{AWS::AccountId}:TrackingTopic"
+    DYNAMODB_TABLE: ${self:service}-${opt:stage, self:provider.stage}
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -17,9 +18,18 @@ provider:
       Resource: "arn:aws:sns:*"
       Action:
         - "sns:*"
+    - Effect: Allow
+      Action:
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
 
 functions:
-  startStepFunction:
+  startTracking:
     handler: tracking.start
     events:
       - http:
@@ -27,7 +37,7 @@ functions:
           method: post
     memorySize: 256
     timeout: 2
-  startTracking:
+  trackVehicles:
     handler: tracking.track
     events:
       - sns: TrackingTopic
@@ -45,6 +55,31 @@ functions:
                 transport_mode: true
                 operator_id: true
                 vehicle_number: true
+
+resources:
+  Resources:
+    TrackingDatabase:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: vehicleId
+            AttributeType: S
+          -
+            AttributeName: createdAt
+            AttributeType: N
+        KeySchema:
+          -
+            AttributeName: vehicleId
+            KeyType: HASH
+          -
+            AttributeName: createdAt
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
 
 plugins:
   - serverless-step-functions
